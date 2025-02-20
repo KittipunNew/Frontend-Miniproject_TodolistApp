@@ -2,7 +2,7 @@ import React from 'react';
 import Navbar from './components/Navbar';
 import TaskItem from './components/TaskItem';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Login from './pages/login';
+import Login from './pages/Login';
 import Register from './pages/Register';
 
 function App() {
