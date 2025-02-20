@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Navbar() {
   const [theme, setTheme] = useState('light');
@@ -9,12 +10,20 @@ function Navbar() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
+  const navigate = useNavigate();
+  const token = localStorage.getItem('token');
+
+  function logout() {
+    localStorage.removeItem('token');
+    navigate('/login');
+  }
+
   return (
     <div className="navbar bg-base-100 shadow-sm">
       <div className="flex-1">
         <h1 className="text-xl font-bold">Task Management</h1>
       </div>
-      <div className="flex-none">
+      <div className="flex-none gap-5">
         <button className="btn btn-square btn-ghost" onClick={toggleTheme}>
           {theme === 'light' ? (
             <svg
@@ -40,6 +49,11 @@ function Navbar() {
             </svg>
           )}
         </button>
+        {token && (
+          <button className="btn btn-error text-white" onClick={logout}>
+            Logout
+          </button>
+        )}
       </div>
     </div>
   );

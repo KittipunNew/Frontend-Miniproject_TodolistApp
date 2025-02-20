@@ -1,72 +1,128 @@
 import { useEffect, useState } from 'react';
 import AddForm from './AddForm';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 function TaskItem() {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
+  const [token, setToken] = useState('');
   const [tasks, setTask] = useState([]);
   const [editId, setEditId] = useState(null); // ใช้สำหรับเช็คเงื่อนไข
   const [editValue, setEditValue] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      setToken(storedToken);
+    } else {
+      navigate('/login');
+    }
+  }, [navigate]);
 
   // ดึงข้อมูลจาก API
   useEffect(() => {
+    if (!token) return;
     const fetchList = async () => {
       try {
-        const response = await axios.get(backendUrl);
+        const response = await axios.get(backendUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (Array.isArray(response.data)) {
           setTask(response.data);
         }
       } catch (err) {
-        console.log(err);
+        console.error('Error fetching tasks:', err);
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+        }
       }
     };
     fetchList();
-  }, []); // ✅ แก้ infinite loop
+  }, [token, backendUrl, navigate]);
 
   // ฟังก์ชันเปลี่ยนค่า Checkbox
   async function toggleCheckbox(index) {
-    const updatedChecked = { ...tasks[index], checked: !tasks[index]?.checked };
-    try {
-      const response = await axios.put(backendUrl, updatedChecked);
-      if (response.status === 200) {
-        setTask(tasks.map((task, i) => (i === index ? updatedChecked : task)));
+    const taskId = tasks[index]._id;
+
+    const updatedChecked = {
+      ...tasks[index],
+      completed: !tasks[index]?.completed,
+    };
+
+    if (token) {
+      try {
+        const response = await axios.put(
+          `${backendUrl}/${taskId}`,
+          updatedChecked,
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }
+        );
+        if (response.status === 200) {
+          setTask(
+            tasks.map((task, i) => (i === index ? updatedChecked : task))
+          );
+        }
+      } catch (err) {
+        console.log(err);
       }
-    } catch (err) {
-      console.log(err);
     }
   }
 
   // ฟังก์ชันแก้ไข;
   function editTask(indexToEdit) {
     setEditId(indexToEdit);
-    setEditValue(tasks[indexToEdit].title); // ตั้งค่า editValue เป็นข้อความเดิม
+    setEditValue(tasks[indexToEdit].name); // ตั้งค่า editValue เป็นข้อความเดิม
   }
 
   // ฟังก์ชันบันทึกข้อความที่แก้ไข
   async function saveEdit(indexToSave) {
-    const updatedTask = { ...tasks[indexToSave], title: editValue };
+    const taskId = tasks[indexToSave]._id;
+    const updatedTask = { ...tasks[indexToSave], name: editValue };
+    if (token) {
+      try {
+        await axios.put(`${backendUrl}/${taskId}`, updatedTask, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        setTask(
+          tasks.map((task, index) =>
+            index === indexToSave ? updatedTask : task
+          )
+        );
+        setEditId(null);
+        setEditValue('');
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  }
+
+  // ฟังก์ชันลบ
+  async function deleteTask(indexToDelete) {
+    const taskId = tasks[indexToDelete]._id; // รับ ObjectId จาก task ที่เลือก
+
     try {
-      await axios.put(backendUrl, updatedTask);
-      setTask(
-        tasks.map((task, index) => (index === indexToSave ? updatedTask : task))
-      );
-      setEditId(null);
-      setEditValue('');
+      const response = await axios.delete(`${backendUrl}/${taskId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }, // เพิ่ม token ใน header
+      });
+
+      if (response.status === 200) {
+        // ลบงานจาก tasks state หลังจากลบสำเร็จ
+        setTask(tasks.filter((_, index) => index !== indexToDelete));
+      }
     } catch (err) {
       console.log(err);
     }
   }
 
-  // ฟังก์ชันลบ
-  async function deleteTask(indexToRemove) {
-    try {
-      await axios.delete(backendUrl);
-      setTask(tasks.filter((_, index) => index !== indexToRemove));
-    } catch (err) {
-      console.log(err);
+  useEffect(() => {
+    if (!token && localStorage.getItem('token')) {
+      setToken(localStorage.getItem('token'));
     }
-  }
+  }, [token]);
 
   return (
     <div className="flex flex-col items-center">
@@ -80,7 +136,7 @@ function TaskItem() {
             <input
               type="checkbox"
               className="checkbox"
-              checked={data.checked || false}
+              checked={data.completed || false}
               onChange={() => toggleCheckbox(index)}
             />
             {/* ตวจสอบ editId ว่าตรงกับ index ไหม ถ้าใช่ให้แสดงกล่อง input */}
@@ -94,10 +150,10 @@ function TaskItem() {
             ) : (
               <h2
                 className={`text-xl font-bold px-2 ${
-                  data.checked ? 'line-through text-gray-400' : ''
+                  data.completed ? 'line-through text-gray-400' : ''
                 }`}
               >
-                {data.title}
+                {data.name}
               </h2>
             )}
             <div className="flex gap-3">

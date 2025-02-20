@@ -1,38 +1,41 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 
 function AddForm(props) {
-  const { tasks, setTask } = props;
+  const { setTask } = props;
   const [input, setInput] = useState('');
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   async function handleSubmit(e) {
+    const token = localStorage.getItem('token');
     e.preventDefault();
     if (!input.trim()) {
       alert('กรุณากรอกข้อมูลให้ถูกต้อง');
       return;
     }
 
-    try {
-      console.log('📌 ส่งข้อมูลไป API:', {
-        title: input.trim(),
-        checked: false,
-      });
+    if (token) {
+      try {
+        const response = await axios.post(
+          backendUrl,
+          {
+            name: input.trim(),
+          },
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
 
-      const response = await axios.post(backendUrl, {
-        title: input.trim(),
-        checked: false,
-      });
+        console.log(response);
 
-      console.log('✅ Response จาก API:', response.data);
+        console.log('✅ Response จาก API:', response.data);
 
-      if (response.data) {
-        setInput(''); // เคลียร์ input
-        setTask((prevTasks) => [...prevTasks, response.data]); // อัปเดต state
+        if (response.data) {
+          setInput(''); // เคลียร์ input
+          setTask((prevTasks) => [...prevTasks, response.data]); // อัปเดต state
+        }
+      } catch (err) {
+        console.error('❌ Error:', err);
       }
-    } catch (err) {
-      console.error('❌ Error:', err);
     }
   }
 
